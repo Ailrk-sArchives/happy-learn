@@ -1,0 +1,6 @@
+cradle:
+  cabal:
+    - path: "./src"
+      component: "lib:happy-learn"
+    - path: "./test/MyLibTest.hs"
+      component: "test:happy-learn-test"
