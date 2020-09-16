@@ -81,6 +81,7 @@ validatePointArray xs
     Right $ PointArray $ NL.fromList xs
   | otherwise = Left $ DataError "Exists element in the list with different shape"
 
+-- new comment
 -- compress Points into compact repa array.
 compactPoints :: R.Shape sh => PointArray sh a -> R.Array R.U sh a
 compactPoints (PointArray t@(x NL.:| _)) =
