@@ -19,7 +19,7 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:
-    HLearn.Cluster.KMeans
+    HLearn.Cluster.KMean
   other-modules:
       Paths_happy_learn
       HLearn.Internal.Data
