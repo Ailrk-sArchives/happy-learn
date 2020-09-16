@@ -1,6 +1,6 @@
 module Main where
 
-import HLearn.Kmean
+import HLearn.Cluster.KMeans
 
 main :: IO ()
-main = putStrLn $ show test
+main = putStrLn $ show "a"

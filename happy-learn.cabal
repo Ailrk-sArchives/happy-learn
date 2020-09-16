@@ -19,13 +19,19 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:
-      HLearn.Kmean
+    HLearn.Cluster.KMeans
   other-modules:
       Paths_happy_learn
+      HLearn.Internal.Data
   -- other-extensions:
   build-depends:
       base >=4.7 && < 5
-    , hmatrix
+    , parallel
+    , deepseq
+    , vector
+    , repa
+    , mtl
+    , transformers
   hs-source-dirs:      src
   default-language:    Haskell2010
 

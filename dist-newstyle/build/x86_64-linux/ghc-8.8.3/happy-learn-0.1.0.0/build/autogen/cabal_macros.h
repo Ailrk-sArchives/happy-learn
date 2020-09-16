@@ -22,16 +22,71 @@
   (major1) == 4 && (major2) == 13 && (minor) <= 0)
 #endif /* MIN_VERSION_base */
 
-/* package hmatrix-0.20.0.0 */
-#ifndef VERSION_hmatrix
-#define VERSION_hmatrix "0.20.0.0"
-#endif /* VERSION_hmatrix */
-#ifndef MIN_VERSION_hmatrix
-#define MIN_VERSION_hmatrix(major1,major2,minor) (\
+/* package deepseq-1.4.4.0 */
+#ifndef VERSION_deepseq
+#define VERSION_deepseq "1.4.4.0"
+#endif /* VERSION_deepseq */
+#ifndef MIN_VERSION_deepseq
+#define MIN_VERSION_deepseq(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  4 || \
+  (major1) == 1 && (major2) == 4 && (minor) <= 4)
+#endif /* MIN_VERSION_deepseq */
+
+/* package mtl-2.2.2 */
+#ifndef VERSION_mtl
+#define VERSION_mtl "2.2.2"
+#endif /* VERSION_mtl */
+#ifndef MIN_VERSION_mtl
+#define MIN_VERSION_mtl(major1,major2,minor) (\
+  (major1) <  2 || \
+  (major1) == 2 && (major2) <  2 || \
+  (major1) == 2 && (major2) == 2 && (minor) <= 2)
+#endif /* MIN_VERSION_mtl */
+
+/* package parallel-3.2.2.0 */
+#ifndef VERSION_parallel
+#define VERSION_parallel "3.2.2.0"
+#endif /* VERSION_parallel */
+#ifndef MIN_VERSION_parallel
+#define MIN_VERSION_parallel(major1,major2,minor) (\
+  (major1) <  3 || \
+  (major1) == 3 && (major2) <  2 || \
+  (major1) == 3 && (major2) == 2 && (minor) <= 2)
+#endif /* MIN_VERSION_parallel */
+
+/* package repa-3.4.1.4 */
+#ifndef VERSION_repa
+#define VERSION_repa "3.4.1.4"
+#endif /* VERSION_repa */
+#ifndef MIN_VERSION_repa
+#define MIN_VERSION_repa(major1,major2,minor) (\
+  (major1) <  3 || \
+  (major1) == 3 && (major2) <  4 || \
+  (major1) == 3 && (major2) == 4 && (minor) <= 1)
+#endif /* MIN_VERSION_repa */
+
+/* package transformers-0.5.6.2 */
+#ifndef VERSION_transformers
+#define VERSION_transformers "0.5.6.2"
+#endif /* VERSION_transformers */
+#ifndef MIN_VERSION_transformers
+#define MIN_VERSION_transformers(major1,major2,minor) (\
   (major1) <  0 || \
-  (major1) == 0 && (major2) <  20 || \
-  (major1) == 0 && (major2) == 20 && (minor) <= 0)
-#endif /* MIN_VERSION_hmatrix */
+  (major1) == 0 && (major2) <  5 || \
+  (major1) == 0 && (major2) == 5 && (minor) <= 6)
+#endif /* MIN_VERSION_transformers */
+
+/* package vector-0.12.1.2 */
+#ifndef VERSION_vector
+#define VERSION_vector "0.12.1.2"
+#endif /* VERSION_vector */
+#ifndef MIN_VERSION_vector
+#define MIN_VERSION_vector(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  12 || \
+  (major1) == 0 && (major2) == 12 && (minor) <= 1)
+#endif /* MIN_VERSION_vector */
 
 /* tool cpphs-1.20.9 */
 #ifndef TOOL_VERSION_cpphs
