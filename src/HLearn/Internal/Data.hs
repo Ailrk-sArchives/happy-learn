@@ -1,10 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedLists #-}
 
 module HLearn.Internal.Data
   ( Point (..),
     PointPair (..),
     Distance (..),
+    PointArray (..),
     mapPoint,
     makePoint,
     makePointPair,
@@ -15,6 +18,7 @@ where
 import qualified Data.Array.Repa as R
 import qualified Data.Array.Repa.Repr.Unboxed as RP
 import qualified Data.Vector as V
+import qualified Data.List.NonEmpty as NL
 import HLearn.Internal.Error
 
 {- Define some generic types that can be used for all algorithms. -}
@@ -52,8 +56,9 @@ makePointPair as@(Point ad _) bs@(Point bd _)
   | otherwise = Left $ DataError "Failed to make point pair with different shapes"
 
 -- make sure the point can be used to index shape sh.
-validPoint :: (Num a, Ord a, R.Shape sh) => Point sh a -> Either InternalError (Point sh a)
-validPoint p@(Point sh vs)
+validatePoint ::
+  (Num a, Ord a, R.Shape sh) => Point sh a -> Either InternalError (Point sh a)
+validatePoint p@(Point sh vs)
   | R.rank sh /= length vs = Left $ DataError "Inconsisent Point, shape mismatch"
   | any (== False) $ zipWith (<) shlist xs = Left $ DataError "wrong data"
   | otherwise = Right $ p
@@ -61,22 +66,33 @@ validPoint p@(Point sh vs)
     shlist = fromIntegral <$> R.listOfShape sh
     xs = V.toList vs
 
+-- points with the same shape
+newtype PointArray sh a = PointArray {unPointArray :: NL.NonEmpty (Point sh a)}
+
 -- return Right if all elements in the list have the same shape
-validatePointsShape :: (R.Shape sh) => [Point sh a] -> Either InternalError [Point sh a]
-validatePointsShape [] = Right []
-validatePointsShape xs
-  | (unDim <$> xs) = undefined
-  | otherwise = undefined
+validatePointArray ::
+  (R.Shape sh) => [Point sh a] -> Either InternalError (PointArray sh a)
+validatePointArray [] = Left $ DataError "PointArray is non empty"
+validatePointArray xs
+  | let dims = (unDim <$> xs)
+        x = head dims
+        eqlen = length $ filter (x ==) dims
+     in eqlen == length dims =
+    Right $ PointArray $ NL.fromList xs
+  | otherwise = Left $ DataError "Exists element in the list with different shape"
 
 -- compress Points into compact repa array.
-compactPoints :: R.Shape sh => [Point sh a] -> R.Array R.U sh a
-compactPoints = undefined
+compactPoints :: R.Shape sh => PointArray sh a -> R.Array R.U sh a
+compactPoints (PointArray t@(x NL.:| _)) =
+  let sh = unDim x
+   in undefined
 
 makePoint ::
   (Num a, Ord a, R.Shape sh) => sh -> V.Vector a -> Either InternalError (Point sh a)
-makePoint = (validPoint .) . Point
+makePoint = (validatePoint .) . Point
 
-zeroPoint :: (Monoid a, Ord a, Num a, R.Shape sh) => sh -> Point sh a
+-- make zero point.
+zeroPoint :: (Ord a, Num a, R.Shape sh) => sh -> Point sh a
 zeroPoint sh =
   Point
     { unPoint = V.replicate (R.rank sh) 0,

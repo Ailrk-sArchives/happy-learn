@@ -1,7 +1,10 @@
 module HLearn.Cluster.Data where
 
-import qualified HLearn.Internal.Data as I
 import qualified Data.Array.Repa as R
+import Data.List (foldl')
+import qualified Data.Vector as V
+import qualified HLearn.Internal.Data as I
+import HLearn.Cluster.Error
 
 data Cluster sh a = Cluster
   { clusterId :: {-# UNPACK #-} !Int,
@@ -9,12 +12,25 @@ data Cluster sh a = Cluster
   }
 
 makeCluster ::
-  (R.Shape sh) => sh -> Int -> R.Array R.U sh (I.Point sh a) -> Cluster sh a
-makeCluster cid points =
+  (R.Shape sh, Ord a, Fractional a) =>
+  sh ->
+  Int ->
+  I.PointArray sh a ->
+  Cluster sh a
+makeCluster sh cid (I.PointArray points) =
   Cluster
     { clusterId = cid,
-      clusterCentroid = undefined
+      clusterCentroid =
+        I.Point
+          { I.unDim = sh,
+            I.unPoint = (\a -> a / fromIntegral count) <$> vs
+          }
     }
   where
-    count = I.mapPoint
-
+    I.Point sh' vs = foldl' add' (I.zeroPoint sh) points
+    count = length points
+    add' (I.Point _ va) (I.Point _ vb) =
+      I.Point
+        { I.unDim = sh,
+          I.unPoint = V.zipWith (+) va vb
+        }
