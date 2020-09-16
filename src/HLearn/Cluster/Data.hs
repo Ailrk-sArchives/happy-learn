@@ -11,6 +11,7 @@ data Cluster sh a = Cluster
     clusterCentroid :: {-# UNPACK #-} !(I.Point sh a)
   }
 
+-- comment
 makeCluster ::
   (R.Shape sh, Ord a, Fractional a) =>
   sh ->
