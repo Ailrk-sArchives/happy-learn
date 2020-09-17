@@ -20,9 +20,9 @@ extra-source-files:  CHANGELOG.md
 library
   exposed-modules:
     HLearn.Cluster.KMean
+    HLearn.Internal.Data
   other-modules:
       Paths_happy_learn
-      HLearn.Internal.Data
   -- other-extensions:
   build-depends:
       base >=4.7 && < 5
@@ -40,7 +40,11 @@ test-suite happy-learn-test
   default-language:    Haskell2010
   other-modules:       Paths_happy_learn
   hs-source-dirs:      test
-  main-is:             MyLibTest.hs
+  main-is:             Spec.hs
   build-depends:
       base >=4.7 && < 5
     , happy-learn
+    , repa
+    , vector
+    , hspec
+    , hspec-discover

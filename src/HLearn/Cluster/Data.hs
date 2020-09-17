@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module HLearn.Cluster.Data where
 
@@ -14,6 +15,7 @@ data Cluster a = Cluster
   { clusterId :: {-# UNPACK #-} !Int,
     clusterCentroid :: {-# UNPACK #-} !(I.Point a)
   }
+  deriving (Show, Eq)
 
 -- | The accumulated point position.
 --     PointSum stores the result of the sum of points without building up
@@ -33,22 +35,17 @@ addPointSumUnsafe (PointSum count (I.Point pss)) (I.Point ps) =
 
 -- | Add a point to PointSum with length check
 addPointSum ::
-  (Fractional a) =>
-  PointSum a ->
-  I.Point a ->
-  Either InternalError (PointSum a)
+  (Fractional a) => PointSum a -> I.Point a -> Either InternalError (PointSum a)
 addPointSum ps@(PointSum _ (I.Point xs)) p@(I.Point ys)
-  | length xs /= length ys = Left $ DataError "cannot add to point sum with different shape "
+  | differentShape = Left $ DataError "cannot add to point sum with different shape"
   | otherwise = Right $ addPointSumUnsafe ps p
+  where
+    differentShape = length xs /= length ys
 {-# INLINE addPointSum #-}
 
 -- | Make cluster from
 makeCluster ::
-  (Ord a, Fractional a) =>
-  Int ->
-  Int ->
-  I.NonEmptyPointList a ->
-  Cluster a
+  (Ord a, Fractional a) => Int -> Int -> I.NonEmptyPointList a -> Cluster a
 makeCluster rank cid (I.NonEmptyPointList points) =
   Cluster
     { clusterId = cid,
@@ -58,8 +55,7 @@ makeCluster rank cid (I.NonEmptyPointList points) =
   where
     I.Point vs = foldl' add' (I.zeroPoint rank) points
     count = length points
-    add' (I.Point va) (I.Point vb) =
-      I.Point {I.unPoint = V.zipWith (+) va vb}
+    add' (I.Point va) (I.Point vb) = I.Point {I.unPoint = V.zipWith (+) va vb}
 
 -- | Convert PointSum to Cluster.
 pointSumToCluser :: (Fractional a) => Int -> PointSum a -> Cluster a

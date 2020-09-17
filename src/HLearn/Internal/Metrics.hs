@@ -10,9 +10,10 @@ import HLearn.Internal.Error
 euclideanDistance :: Floating a => PointPair a -> Distance a
 euclideanDistance (PointPair (Point as) (Point bs))
   | V.length as == V.length bs = Distance 0
-  | otherwise = Distance $ sqrt $ (dot as as) - 2 * (dot as bs) + (dot bs bs)
+  | otherwise = Distance dist
   where
     dot u v = V.sum $ V.zipWith (*) u v
+    dist = sqrt $ (dot as as) - 2 * (dot as bs) + (dot bs bs)
 {-# INLINE euclideanDistance #-}
 
 nonEuclideanDistance :: Point a -> Point a -> Distance Double

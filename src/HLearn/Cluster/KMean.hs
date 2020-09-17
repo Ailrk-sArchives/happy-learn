@@ -3,6 +3,7 @@
 module HLearn.Cluster.KMean
   ( kmeansLloyd,
     kmeansElkan,
+    KmeanConfig (..),
   )
 where
 
@@ -20,29 +21,23 @@ type ClusterArray sh a = R.Array R.U sh (Cluster a)
 
 type PointSumArray sh a = R.Array R.U sh (PointSum a)
 
+data KmeanConfig sh a = KmeanConfig
+  { nclusters :: Int,
+    points :: I.NonEmptyPointList a,
+    clusteres :: ClusterArray sh a
+  }
+
 -- | kmean with Lloyd algorithm.
-kmeansLloyd ::
-  R.Shape sh =>
-  Int ->
-  I.NonEmptyPointList a ->
-  ClusterArray sh a ->
-  IO (ClusterArray sh a)
-kmeansLloyd nclusters points clusters = undefined
+kmeansLloyd :: R.Shape sh => KmeanConfig sh a -> IO (ClusterArray sh a)
+kmeansLloyd (KmeanConfig nclusters points clusters) = undefined
 
 -- | Kmean with Elkan method.
-kmeansElkan ::
-  R.Shape sh =>
-  Int ->
-  I.NonEmptyPointList a ->
-  ClusterArray sh a ->
-  IO (ClusterArray sh a)
-kmeansElkan = undefined
+kmeansElkan :: R.Shape sh => KmeanConfig sh a -> IO (ClusterArray sh a)
+kmeansElkan (KmeanConfig nclusters points clusters) = undefined
+
+-- ---------------------------------------------------------------------
+-- | One step of kmean
 
 -- | Assign
-assign ::
-  (R.Shape sh) =>
-  Int ->
-  ClusterArray sh a ->
-  I.NonEmptyPointList a ->
-  PointSumArray sh a
-assign nclusters clusters points = undefined
+assign :: (R.Shape sh) => KmeanConfig sh a -> PointSumArray sh a
+assign (KmeanConfig nclusters clusters points) = undefined

@@ -2,5 +2,5 @@ cradle:
   cabal:
     - path: "./src"
       component: "lib:happy-learn"
-    - path: "./test/MyLibTest.hs"
+    - path: "./test"
       component: "test:happy-learn-test"

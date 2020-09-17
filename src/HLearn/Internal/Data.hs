@@ -35,18 +35,34 @@ data PointPair a = PointPair !(Point a) !(Point a)
 data Distance a where
   Distance :: Num a => a -> Distance a
 
+-- ------------------------------------------------------------------------------
+-- internal definitions
+
+inBoundCheck :: (Ord a, Num a, R.Shape sh) => sh -> Point a -> Bool
+inBoundCheck sh (Point xs) = any (== False) $ zipWith (<) shlist vs
+  where
+    shlist = fromIntegral <$> R.listOfShape sh
+    vs = V.toList xs
+{-# INLINE inBoundCheck #-}
+
+-- | Make sure the point can be used to index shape sh.
+validatePoint ::
+  (Num a, Ord a, R.Shape sh) => sh -> Point a -> Either InternalError (Point a)
+validatePoint sh p@(Point vs)
+  | shapeMismatch = Left $ DataError "Inconsisent Point, shape mismatch"
+  | outOfBound = Left $ DataError "Point failed inbound check"
+  | otherwise = Right $ p
+  where
+    shapeMismatch = R.rank sh /= length vs
+    outOfBound = inBoundCheck sh p
+
+
 mapPoint :: (a -> b) -> Point a -> Either InternalError (Point b)
 mapPoint f (Point vs)
   | True = undefined
   | otherwise = undefined
   where
     vs' = f <$> vs
-
-inBoundCheck :: (Ord a, Num a, R.Shape sh) => sh -> Point a -> Bool
-inBoundCheck sh (Point xs) = any (== False) $ zipWith (<) shlist (V.toList xs)
-  where
-    shlist = fromIntegral <$> R.listOfShape sh
-{-# INLINE inBoundCheck #-}
 
 -- | Guarantee point pair retured are of the same shape.
 makePointPair ::
@@ -56,21 +72,13 @@ makePointPair ::
   Point a ->
   Either InternalError (PointPair a)
 makePointPair sh as@(Point ad) bs@(Point bd)
-  | length ad /= length bd =
-    Left $ DataError $ leftMsg <> "points have different shape"
-  | all (== True) (not . inBoundCheck sh <$> [as, bs]) =
-    Left $ IndexError $ leftMsg <> "failed inbound check"
+  | shapeMismatch = Left $ DataError $ leftMsg <> "points have different shape"
+  | outOfBound = Left $ IndexError $ leftMsg <> "failed inbound check"
   | otherwise = Right $ PointPair as bs
   where
     leftMsg = "Failed to make point pair: "
-
--- | Make sure the point can be used to index shape sh.
-validatePoint ::
-  (Num a, Ord a, R.Shape sh) => sh -> Point a -> Either InternalError (Point a)
-validatePoint sh p@(Point vs)
-  | R.rank sh /= length vs = Left $ DataError "Inconsisent Point, shape mismatch"
-  | inBoundCheck sh p = Left $ DataError "Point failed inbound check"
-  | otherwise = Right $ p
+    shapeMismatch = length ad /= length bd
+    outOfBound = all (== True) (not . inBoundCheck sh <$> [as, bs])
 
 makePoint ::
   (Num a, Ord a, R.Shape sh) => sh -> V.Vector a -> Either InternalError (Point a)
@@ -88,6 +96,7 @@ zeroPoint dim =
 --    NonEmptyPointList guarantee all points has the same size
 newtype NonEmptyPointList a = NonEmptyPointList
   {unPointArray :: NL.NonEmpty (Point a)}
+  deriving (Show)
 
 -- | Return Right if all elements in the list have the same shape
 makeNonEmptyPointList :: [Point a] -> Either InternalError (NonEmptyPointList a)
