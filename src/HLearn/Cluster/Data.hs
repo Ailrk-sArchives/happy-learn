@@ -6,11 +6,8 @@
 module HLearn.Cluster.Data where
 
 import qualified Data.Array.Repa as R
-import qualified Data.Array.Repa.Repr.Unboxed as RR
 import Data.List (foldl')
 import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Generic as G
-import qualified Data.Vector.Generic.Mutable as M
 import HLearn.Cluster.Error
 import HLearn.Internal.Error
 import qualified HLearn.Internal.Data as I
@@ -34,9 +31,6 @@ data PointSum a where
     {-# UNPACK #-} !Int ->
     {-# UNPACK #-} !(I.Point a) ->
     PointSum a
-
--- ------------------------------------------------------------------------------
--- to unboxed
 
 -- ------------------------------------------------------------------------------
 -- operations

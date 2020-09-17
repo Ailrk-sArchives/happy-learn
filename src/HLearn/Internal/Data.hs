@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module HLearn.Internal.Data
   ( Point (..),
@@ -14,6 +11,7 @@ module HLearn.Internal.Data
     makePoint,
     makePointPair,
     zeroPoint,
+    compactPoints,
   )
 where
 
@@ -21,8 +19,7 @@ import Control.Monad (replicateM_)
 import qualified Data.Array.Repa as R
 import qualified Data.Array.Repa.Repr.Unboxed as RP
 import qualified Data.List.NonEmpty as NL
-import qualified Data.Vector.Generic as VG
-import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Unboxed.Mutable as MV
 import qualified Data.Vector.Unboxed as V
 import HLearn.Internal.Error
 
@@ -120,23 +117,22 @@ makeNonEmptyPointList xs
 
 -- | Compress Points into compact repa array.
 --     this will return an 1d array with shape (Z :. len :. rank)
-compactPoints :: NonEmptyPointList a -> R.Array R.U R.DIM2 a
-compactPoints (NonEmptyPointList t@(x NL.:| _)) = undefined
-
--- where
---   rank' = length . unPoint $ x
---   x' = length t
---   sh = R.Z R.:. x' R.:. rank'
---   unboxedArray = V.create $ do
---     let idxedList = [0 ..] `zip` (NL.toList t)
---         totalSize = length t * V.length (unPoint x)
---     v <- MV.new $ totalSize
---     sequence_
---       [ MV.write v (i * rank' + j) e
---         | (i, pv) <- idxedList,
---           (j, e) <- [0 ..] `zip` (V.toList . unPoint $ pv)
---       ]
---     return v
+compactPoints :: (V.Unbox a) => NonEmptyPointList a -> R.Array R.U R.DIM2 a
+compactPoints (NonEmptyPointList t@(x NL.:| _)) = R.fromUnboxed sh unboxedArray
+  where
+    rank' = V.length . unPoint $ x
+    x' = length t
+    sh = R.Z R.:. x' R.:. rank'
+    unboxedArray = V.create $ do
+      let idxedList = [0 ..] `zip` (NL.toList t)
+          totalSize = length t * V.length (unPoint x)
+      v <- MV.new $ totalSize
+      sequence_
+        [ MV.write v (i * rank' + j) e
+          | (i, pv) <- idxedList,
+            (j, e) <- [0 ..] `zip` (V.toList . unPoint $ pv)
+        ]
+      return v
 
 mapPoint :: (a -> b) -> Point a -> Either InternalError (Point b)
 mapPoint f (Point vs)
