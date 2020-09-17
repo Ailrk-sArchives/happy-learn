@@ -1,4 +1,5 @@
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module HLearn.Cluster.KMean
   ( kmeansLloyd,
@@ -8,6 +9,7 @@ module HLearn.Cluster.KMean
 where
 
 import qualified Data.Array.Repa as R
+import qualified Data.Array.Repa.Repr.Unboxed as RR
 import HLearn.Cluster.Data
 import qualified HLearn.Internal.Data as I
 
@@ -36,8 +38,15 @@ kmeansElkan :: R.Shape sh => KmeanConfig sh a -> IO (ClusterArray sh a)
 kmeansElkan (KmeanConfig nclusters points clusters) = undefined
 
 -- ---------------------------------------------------------------------
+-- Internal definitions
+
 -- | One step of kmean
+step :: (R.Shape sh) => KmeanConfig sh a -> ClusterArray sh a
+step (KmeanConfig nclusters clusters points) = undefined
 
 -- | Assign
 assign :: (R.Shape sh) => KmeanConfig sh a -> PointSumArray sh a
 assign (KmeanConfig nclusters clusters points) = undefined
+
+nextClusters :: (RR.Unbox a, R.Shape sh) => PointSumArray sh a -> ClusterArray sh a
+nextClusters ps = undefined
