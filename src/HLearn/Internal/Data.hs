@@ -6,8 +6,8 @@ module HLearn.Internal.Data
   ( Point (..),
     PointPair (..),
     Distance (..),
-    NonEmptyPointArray (..),
-    makeNonEmptyPointArray,
+    NonEmptyPointList (..),
+    makeNonEmptyPointList,
     mapPoint,
     makePoint,
     makePointPair,
@@ -23,12 +23,13 @@ import HLearn.Internal.Error
 
 {- Define some generic types that can be used for all algorithms. -}
 
--- used to index.
+-- | Used to index.
 data Point a = Point
   { unPoint :: !(V.Vector a) -- coordinate of the point.
   }
-  deriving (Show, Read, Eq)
+  deriving (Show, Read, Eq, Functor)
 
+-- | PointPair guarantee two points are of the same shape.
 data PointPair a = PointPair !(Point a) !(Point a)
 
 data Distance a where
@@ -45,8 +46,9 @@ inBoundCheck :: (Ord a, Num a, R.Shape sh) => sh -> Point a -> Bool
 inBoundCheck sh (Point xs) = any (== False) $ zipWith (<) shlist (V.toList xs)
   where
     shlist = fromIntegral <$> R.listOfShape sh
+{-# INLINE inBoundCheck #-}
 
--- guarantee point pair retured are of the same shape.
+-- | Guarantee point pair retured are of the same shape.
 makePointPair ::
   (R.Shape sh, RP.Unbox a, Ord a, Num a) =>
   sh ->
@@ -62,7 +64,7 @@ makePointPair sh as@(Point ad) bs@(Point bd)
   where
     leftMsg = "Failed to make point pair: "
 
--- make sure the point can be used to index shape sh.
+-- | Make sure the point can be used to index shape sh.
 validatePoint ::
   (Num a, Ord a, R.Shape sh) => sh -> Point a -> Either InternalError (Point a)
 validatePoint sh p@(Point vs)
@@ -74,29 +76,30 @@ makePoint ::
   (Num a, Ord a, R.Shape sh) => sh -> V.Vector a -> Either InternalError (Point a)
 makePoint sh = validatePoint sh . Point
 
--- make zero point.
-zeroPoint :: (Ord a, Num a, R.Shape sh) => sh -> Point a
-zeroPoint sh =
+-- | Make zero point.
+zeroPoint :: (Ord a, Num a) => Int -> Point a
+zeroPoint dim =
   Point
-    { unPoint = V.replicate (R.rank sh) 0
+    { unPoint = V.replicate dim 0
     }
+{-# INLINE zeroPoint #-}
 
--- points with the same shape --
-newtype NonEmptyPointArray a = NonEmptyPointArray
+-- | Points with the same shape
+--    NonEmptyPointList guarantee all points has the same size
+newtype NonEmptyPointList a = NonEmptyPointList
   {unPointArray :: NL.NonEmpty (Point a)}
 
--- return Right if all elements in the list have the same shape
-makeNonEmptyPointArray :: [Point a] -> Either InternalError (NonEmptyPointArray a)
-makeNonEmptyPointArray [] = Left $ DataError "PointArray is non empty"
-makeNonEmptyPointArray xs
+-- | Return Right if all elements in the list have the same shape
+makeNonEmptyPointList :: [Point a] -> Either InternalError (NonEmptyPointList a)
+makeNonEmptyPointList [] = Left $ DataError "PointArray is non empty"
+makeNonEmptyPointList xs
   | let dims = (length . unPoint <$> xs)
         x = head dims
         eqlen = length $ filter (x ==) dims
      in eqlen == length dims =
-    Right $ NonEmptyPointArray $ NL.fromList xs
+    Right $ NonEmptyPointList $ NL.fromList xs
   | otherwise = Left $ DataError "Exists element in the list with different shape"
 
--- new comment
--- compress Points into compact repa array.
-compactPoints :: R.Shape sh => NonEmptyPointArray a -> R.Array R.U sh a
-compactPoints (NonEmptyPointArray t@(x NL.:| _)) = undefined
+-- | Compress Points into compact repa array.
+compactPoints :: R.Shape sh => NonEmptyPointList a -> R.Array R.U sh a
+compactPoints (NonEmptyPointList t@(x NL.:| _)) = undefined
