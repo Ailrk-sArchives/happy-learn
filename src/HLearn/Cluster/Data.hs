@@ -28,8 +28,8 @@ data Cluster a = Cluster
 data PointSum a where
   PointSum ::
     Fractional a =>
-    {-# UNPACK #-} !Int ->
-    {-# UNPACK #-} !(I.Point a) ->
+    {-# UNPACK #-} !Int -> -- cluster id
+    {-# UNPACK #-} !(I.Point a) -> -- sum of points
     PointSum a
 
 -- ------------------------------------------------------------------------------
@@ -64,6 +64,9 @@ makeCluster rank cid (I.NonEmptyPointList points) =
     I.Point vs = foldl' add' (I.zeroPoint rank) points
     count = length points
     add' (I.Point va) (I.Point vb) = I.Point {I.unPoint = V.zipWith (+) va vb}
+
+clusterDim :: (V.Unbox a) => Cluster a -> Int
+clusterDim (Cluster _ centroid) = (V.length . I.unPoint) centroid
 
 -- | Convert PointSum to Cluster.
 pointSumToCluser :: (V.Unbox a, Fractional a) => Int -> PointSum a -> Cluster a

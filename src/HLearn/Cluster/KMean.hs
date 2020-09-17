@@ -3,17 +3,20 @@
 
 module HLearn.Cluster.KMean
   ( kmeansLloyd,
-    kmeansElkan,
     KmeanConfig (..),
   )
 where
 
 import Control.Monad.Identity
+import qualified Data.List as L
+import Data.Function (on)
 import qualified Data.Array.Repa as R
-import qualified Data.Vector as VV
-import qualified Data.Vector.Unboxed as V
-import HLearn.Internal.Data
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Unboxed as UV
 import HLearn.Cluster.Data
+import HLearn.Internal.Data
+import HLearn.Internal.Metrics as M
 import qualified HLearn.Internal.Data as I
 
 -- Kmean choose centroids that minize the sun of squares within cluster,
@@ -23,9 +26,9 @@ import qualified HLearn.Internal.Data as I
 --     ∑ min(|| xᵢ - μⱼ ||²), μⱼ ∈ ℂ
 --    i=0
 
-type Clusters a = VV.Vector (Cluster a)
+type Clusters a = V.Vector (Cluster a)
 
-type PointSums a = VV.Vector (PointSum a)
+type PointSums a = V.Vector (PointSum a)
 
 data KmeanConfig a = KmeanConfig
   { nclusters :: Int,
@@ -34,7 +37,7 @@ data KmeanConfig a = KmeanConfig
   }
 
 -- | kmean with Lloyd algorithm.
-kmeansLloyd :: (V.Unbox a, Fractional a, Eq a) => KmeanConfig a -> IO (Clusters a)
+kmeansLloyd :: (UV.Unbox a, Floating a, Ord a) => KmeanConfig a -> IO (Clusters a)
 kmeansLloyd c@(KmeanConfig nclusters clusters points) = loop 0 clusters
   where
     loop n clusters = do
@@ -43,29 +46,39 @@ kmeansLloyd c@(KmeanConfig nclusters clusters points) = loop 0 clusters
         then return clusters
         else loop (n + 1) clusters'
 
--- | Kmean with Elkan method.
-kmeansElkan :: KmeanConfig a -> IO (Clusters a)
-kmeansElkan (KmeanConfig nclusters clusters points) = undefined
-
 -- ---------------------------------------------------------------------
 -- Internal definitions
 
 -- | One step of kmean
-step :: (V.Unbox a, Fractional a) => KmeanConfig a -> Clusters a
+step :: (UV.Unbox a, Floating a, Ord a) => KmeanConfig a -> Clusters a
 step config = nextClusters (assign config)
 
 -- | Assign closest data points to the centroid
 --     each cluster corresponds to a point sum.
-assign :: (V.Unbox a, Fractional a) => KmeanConfig a -> PointSums a
-assign (KmeanConfig nclusters clusters points) = undefined
+assign :: (UV.Unbox a, Floating a, Ord a) => KmeanConfig a -> PointSums a
+assign (KmeanConfig nclusters clusters points) = V.create $ do
+  let dim = clusterDim $ V.head clusters
+  vec <- MV.replicate nclusters (PointSum 0 (I.zeroPoint dim))
+  let
+      add p = do
+        let c = nearest p
+            cid = clusterId c
+        ps <- MV.read vec cid
+        MV.write vec cid $! addPointSum ps p
+
+  return vec
   where
     pointArray = compactPoints points
-    distance = undefined
+    nearest p =
+      fst $
+        L.minimumBy
+          (compare `on` snd)
+          [(c, M.euclideanDistance p (clusterCentroid c)) | c <- V.toList clusters]
 
-nextClusters :: (V.Unbox a) => PointSums a -> Clusters a
+nextClusters :: (UV.Unbox a) => PointSums a -> Clusters a
 nextClusters ps =
-  VV.fromList
+  V.fromList
     [ pointSumToCluser i ps
-      | (i, ps@(PointSum count _)) <- [0 ..] `zip` (VV.toList ps),
+      | (i, ps@(PointSum count _)) <- [0 ..] `zip` (V.toList ps),
         count > 0
     ]
