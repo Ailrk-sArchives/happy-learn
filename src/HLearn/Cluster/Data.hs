@@ -27,7 +27,6 @@ data Cluster a = Cluster
 --     any extra data structure.
 data PointSum a where
   PointSum ::
-    Fractional a =>
     {-# UNPACK #-} !Int -> -- cluster id
     {-# UNPACK #-} !(I.Point a) -> -- sum of points
     PointSum a

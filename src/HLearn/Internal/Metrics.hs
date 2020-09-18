@@ -7,7 +7,7 @@ import HLearn.Internal.Error
 -- | The distance matrix between point x and y.
 --     This method works for arbitrary dimension.
 --     dist(x, y) = sqrt(dot(x, x) - 2 * dot(x, y) + dot x y)
-euclideanDistance :: (Floating a, V.Unbox a) => Point a -> Point a -> a
+euclideanDistance :: Point Double -> Point Double -> Double
 euclideanDistance (Point as) (Point bs)
   | V.length as == V.length bs = 0
   | otherwise = dist

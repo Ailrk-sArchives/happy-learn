@@ -8,9 +8,9 @@ module HLearn.Cluster.KMean
 where
 
 import Control.Monad.Identity
-import qualified Data.List as L
-import Data.Function (on)
 import qualified Data.Array.Repa as R
+import Data.Function (on)
+import qualified Data.List as L
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
@@ -23,7 +23,7 @@ import qualified HLearn.Internal.Data as I
 -- AKA intertia.
 -- goal is to find μⱼ s.t
 --     n
---     ∑ min(|| xᵢ - μⱼ ||²), μⱼ ∈ ℂ
+--     ∑ min(|| xᵢ - μⱼ ||²), μⱼ ∈ C
 --    i=0
 
 type Clusters a = V.Vector (Cluster a)
@@ -37,7 +37,7 @@ data KmeanConfig a = KmeanConfig
   }
 
 -- | kmean with Lloyd algorithm.
-kmeansLloyd :: (UV.Unbox a, Floating a, Ord a) => KmeanConfig a -> IO (Clusters a)
+kmeansLloyd :: KmeanConfig Double -> IO (Clusters Double)
 kmeansLloyd c@(KmeanConfig nclusters clusters points) = loop 0 clusters
   where
     loop n clusters = do
@@ -50,32 +50,54 @@ kmeansLloyd c@(KmeanConfig nclusters clusters points) = loop 0 clusters
 -- Internal definitions
 
 -- | One step of kmean
-step :: (UV.Unbox a, Floating a, Ord a) => KmeanConfig a -> Clusters a
+step :: KmeanConfig Double -> Clusters Double
 step config = nextClusters (assign config)
 
 -- | Assign closest data points to the centroid
 --     each cluster corresponds to a point sum.
-assign :: (UV.Unbox a, Floating a, Ord a) => KmeanConfig a -> PointSums a
+assign :: KmeanConfig Double -> PointSums Double
 assign (KmeanConfig nclusters clusters points) = V.create $ do
   let dim = clusterDim $ V.head clusters
   vec <- MV.replicate nclusters (PointSum 0 (I.zeroPoint dim))
   let
-      add p = do
-        let c = nearest p
-            cid = clusterId c
-        ps <- MV.read vec cid
-        MV.write vec cid $! addPointSum ps p
+    add p = do
+      let c = nearest p
+          cid = clusterId c
+      ps <- MV.read vec cid
+      MV.write vec cid $! addPointSum ps p
 
   return vec
   where
     pointArray = compactPoints points
     nearest p =
-      fst $
-        L.minimumBy
-          (compare `on` snd)
-          [(c, M.euclideanDistance p (clusterCentroid c)) | c <- V.toList clusters]
+      L.minimumBy
+        (compare `on` ((M.euclideanDistance p) . clusterCentroid))
+        (V.toList clusters)
 
-nextClusters :: (UV.Unbox a) => PointSums a -> Clusters a
+
+-- fold triple of point into cluster id
+-- nearest ::
+--   (UV.Unbox a, Floating a) => R.Array R.U R.DIM2 a -> R.Array R.U R.DIM1 a
+
+-- TODO
+-- I want to be able to access inner most dimension at once.
+-- so I can calculate the euclideanDistance base on that.
+--
+-- nearest =
+--   R.foldP
+--     ( \a b ->
+--         let dist = M.euclideanDistance (Point a) (Point b)
+--          in undefined
+--     )
+--     0
+
+-- nearest p =
+--   fst $
+--     L.minimumBy
+--       (compare `on` snd)
+--       [(c, M.euclideanDistance p (clusterCentroid c)) | c <- V.toList clusters]
+
+nextClusters :: PointSums Double -> Clusters Double
 nextClusters ps =
   V.fromList
     [ pointSumToCluser i ps
