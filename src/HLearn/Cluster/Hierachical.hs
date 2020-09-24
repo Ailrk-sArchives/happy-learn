@@ -1,9 +1,12 @@
 module HLearn.Cluster.Hierachical where
 
-import HLearn.Internal.Data
+import           HLearn.Internal.Data
 
+-- bottom up approach
 data AgglomerativeConfig = AgglomerativeConfig
-  { agglomNclusters :: Int,
-    agglomDistanceThreashold :: Double,
-    agglomAffinity :: Point Double -> Point Double -> Double
+  { agglNum :: Int
+  , agglDistThreashold :: Double
+  , agglAffinity :: Point -> Point -> Double
   }
+
+

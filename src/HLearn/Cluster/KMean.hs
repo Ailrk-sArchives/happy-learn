@@ -1,106 +1,88 @@
-{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module HLearn.Cluster.KMean
-  ( kmeansLloyd,
-    KmeanConfig (..),
-  )
-where
+module HLearn.Cluster.KMean where
 
-import Control.Monad.Identity
-import qualified Data.Array.Repa as R
-import Data.Function (on)
-import qualified Data.List as L
-import qualified Data.Vector as V
-import qualified Data.Vector.Mutable as MV
-import qualified Data.Vector.Unboxed as UV
-import HLearn.Cluster.Data
-import HLearn.Internal.Data
-import HLearn.Internal.Metrics as M
-import qualified HLearn.Internal.Data as I
+import           Data.List
+import           Data.Function                  ( on )
+import           Control.Monad.State
+import           System.IO
+import           HLearn.Internal.Data
+import           HLearn.Cluster.Data
+import           HLearn.Cluster.Error
+import           HLearn.Internal.Metric
+import qualified Data.Vector                   as Vec
+import qualified Data.Vector.Mutable           as MVec
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Trans.Except
+import           System.Random
 
--- Kmean choose centroids that minize the sun of squares within cluster,
--- AKA intertia.
--- goal is to find μⱼ s.t
---     n
---     ∑ min(|| xᵢ - μⱼ ||²), μⱼ ∈ C
---    i=0
+limit = 100
 
-type Clusters a = V.Vector (Cluster a)
+data KMeanConfig = KMeanConfig { kconfigdim :: Int
+                               , kconfignum :: Int
+                               , kconfigpoints :: [Point]
+                               , kconfigbound :: [(Double, Double)]
+                               }
 
-type PointSums a = V.Vector (PointSum a)
+data KMeanState = KMeanState { ksdim :: Int
+                             , ksnum :: Int  -- number of clusters
+                             , ksclusters :: [Cluster]
+                             , kspoints :: [Point]
+                             }
 
-data KmeanConfig a = KmeanConfig
-  { nclusters :: Int,
-    clusters :: Clusters a,
-    points :: I.NonEmptyPointList a
-  }
+type KMean' a = ExceptT ClusterError (State KMeanState) a
 
--- | kmean with Lloyd algorithm.
-kmeansLloyd :: KmeanConfig Double -> IO (Clusters Double)
-kmeansLloyd c@(KmeanConfig nclusters clusters points) = loop 0 clusters
-  where
-    loop n clusters = do
-      let clusters' = step c
-      if clusters' == clusters
-        then return clusters
-        else loop (n + 1) clusters'
+newtype KMean a = KMean { unKmean :: KMean' a }
+  deriving (Functor, Applicative, Monad, MonadState KMeanState, MonadError ClusterError)
 
--- ---------------------------------------------------------------------
--- Internal definitions
+runKmeanLloy :: KMeanConfig -> IO (Either ClusterError [Cluster])
+runKmeanLloy (KMeanConfig dim ncluster points bounds) = do
+  cs <- initClusters
+  let s = initState cs
+  return $ flip evalState s $ runExceptT (unKmean kmeanLloy)
+ where
+  initClusters = do
+    ps <- replicateM ncluster $ randomPoint bounds
+    return [ Cluster idx p | (idx, p) <- [0 ..] `zip` ps ]
+  initState cl = KMeanState { ksdim      = dim
+                         , ksnum      = ncluster
+                         , ksclusters = cl
+                         , kspoints   = points
+                         }
 
--- | One step of kmean
-step :: KmeanConfig Double -> Clusters Double
-step config = nextClusters (assign config)
+kmeanLloy :: KMean [Cluster]
+kmeanLloy = loop 0
+ where
+  loop :: Int -> KMean [Cluster]
+  loop n = do
+    s@(KMeanState _ ncluster clusters _) <- get
+    when (ncluster > limit) $ do
+      liftEither $ Left (ClusterInitError "too many clusters")
+    clusters' <- step
+    return clusters'
+    if and $ zipWith sameCluster clusters' clusters
+      then return clusters
+      else put (s { ksclusters = clusters' }) >> loop (n + 1)
 
--- | Assign closest data points to the centroid
---     each cluster corresponds to a point sum.
-assign :: KmeanConfig Double -> PointSums Double
-assign (KmeanConfig nclusters clusters points) = V.create $ do
-  let dim = clusterDim $ V.head clusters
-  vec <- MV.replicate nclusters (PointSum 0 (I.zeroPoint dim))
-  let
-    add p = do
-      let c = nearest p
-          cid = clusterId c
-      ps <- MV.read vec cid
-      MV.write vec cid $! addPointSum ps p
+step :: KMean [Cluster]
+step = assign >>= newCluster
 
-  return vec
-  where
-    pointArray = compactPoints points
-    nearest p =
-      L.minimumBy
-        (compare `on` ((M.euclideanDistance p) . clusterCentroid))
-        (V.toList clusters)
-
-
--- fold triple of point into cluster id
--- nearest ::
---   (UV.Unbox a, Floating a) => R.Array R.U R.DIM2 a -> R.Array R.U R.DIM1 a
-
--- TODO
--- I want to be able to access inner most dimension at once.
--- so I can calculate the euclideanDistance base on that.
---
--- nearest =
---   R.foldP
---     ( \a b ->
---         let dist = M.euclideanDistance (Point a) (Point b)
---          in undefined
---     )
---     0
-
--- nearest p =
---   fst $
---     L.minimumBy
---       (compare `on` snd)
---       [(c, M.euclideanDistance p (clusterCentroid c)) | c <- V.toList clusters]
-
-nextClusters :: PointSums Double -> Clusters Double
-nextClusters ps =
-  V.fromList
-    [ pointSumToCluser i ps
-      | (i, ps@(PointSum count _)) <- [0 ..] `zip` (V.toList ps),
-        count > 0
-    ]
+assign :: KMean (Vec.Vector PointSum)
+assign = do
+  KMeanState dim ncluster clusters points <- get
+  let nearestCluster p =
+        fst $ minimumBy (compare `on` snd) [ mkpair c p | c <- clusters ]
+  return
+    $ (Vec.create $ do
+        vec <- MVec.replicate ncluster (PointSum 0 $ zeroPoint dim)
+        let addpoint p = do
+              let c   = nearestCluster p
+                  cid = clusterId c
+              ps <- MVec.read vec cid
+              MVec.write vec cid $! addToPointSum ps p
+        mapM_ addpoint points
+        return vec
+      )
+  where mkpair c p = (c, sqDistance (clusterCent c) p)

@@ -5,74 +5,46 @@
 
 module HLearn.Cluster.Data where
 
-import qualified Data.Array.Repa as R
-import Data.List (foldl')
-import qualified Data.Vector.Unboxed as V
-import HLearn.Cluster.Error
-import HLearn.Internal.Error
-import qualified HLearn.Internal.Data as I
+import           HLearn.Internal.Data
+import           HLearn.Internal.Metric
+import           Data.Vector.Generic           as G
+import           Control.DeepSeq
+import qualified Data.Vector                   as Vec
+import qualified Data.Vector.Mutable           as MVec
+import           Control.Monad.State
 
--- ------------------------------------------------------------------------------
--- data definitions
+data Cluster = Cluster { clusterId :: !Int
+                       , clusterCent :: !Point} deriving (Eq, Show)
 
--- | Cluster of a group of point.
-data Cluster a = Cluster
-  { clusterId :: {-# UNPACK #-} !Int,
-    clusterCentroid :: {-# UNPACK #-} !(I.Point a)
+data PointSum = PointSum { psumCount :: !Int
+                         , psumPoint :: !Point
+                         } deriving (Eq, Show)
+
+instance NFData PointSum where
+  rnf (PointSum count (Point dim xs)) = ()
+
+addToPointSum :: PointSum -> Point -> PointSum
+addToPointSum (PointSum count (Point _ ps)) p@(Point _ xs) =
+  PointSum (count + 1) (p { unPoint = G.zipWith (+) xs ps })
+
+pointSumToCluster :: Int -> PointSum -> Cluster
+pointSumToCluster cid (PointSum count p) = Cluster
+  { clusterId   = cid
+  , clusterCent = p { unPoint = G.map (/ (fromIntegral count)) $ unPoint p }
   }
-  deriving (Show, Eq)
 
--- | The accumulated point position.
---     PointSum stores the result of the sum of points without building up
---     any extra data structure.
-data PointSum a where
-  PointSum ::
-    {-# UNPACK #-} !Int -> -- cluster id
-    {-# UNPACK #-} !(I.Point a) -> -- sum of points
-    PointSum a
+-- | indicate if two clusters are close enough that we can
+-- treet them as the same cluster
+sameCluster :: Cluster -> Cluster -> Bool
+sameCluster (Cluster a _) (Cluster b _) | a /= b = False
+sameCluster (Cluster _ as) (Cluster _ bs)        = (sqDistance as bs) < 0.001
 
--- ------------------------------------------------------------------------------
--- operations
+-- | filter away clustser has no point close to it.
+newCluster :: (MonadState s m) => Vec.Vector PointSum -> m [Cluster]
+newCluster vec =
+  return
+    $ [ pointSumToCluster i ps
+      | (i, ps@(PointSum count _)) <- [0 ..] `Prelude.zip` (Vec.toList vec)
+      , count > 0
+      ]
 
--- | Add a point to PointSum without length check
-addPointSumUnsafe :: (Fractional a, V.Unbox a) => PointSum a -> I.Point a -> PointSum a
-addPointSumUnsafe (PointSum count (I.Point pss)) (I.Point ps) =
-  let zs = V.zipWith (+) pss ps in PointSum (count + 1) (I.Point $ zs)
-{-# INLINE addPointSumUnsafe #-}
-
--- | Add a point to PointSum with length check
-addPointSum ::
-  (V.Unbox a, Fractional a) => PointSum a -> I.Point a -> Either InternalError (PointSum a)
-addPointSum ps@(PointSum _ (I.Point xs)) p@(I.Point ys)
-  | differentShape = Left $ DataError "cannot add to point sum with different shape"
-  | otherwise = Right $ addPointSumUnsafe ps p
-  where
-    differentShape = V.length xs /= V.length ys
-{-# INLINE addPointSum #-}
-
--- | Make cluster from
-makeCluster ::
-  (V.Unbox a, Ord a, Fractional a) => Int -> Int -> I.NonEmptyPointList a -> Cluster a
-makeCluster rank cid (I.NonEmptyPointList points) =
-  Cluster
-    { clusterId = cid,
-      clusterCentroid =
-        I.Point $ V.map (\a -> a / fromIntegral count) vs
-    }
-  where
-    I.Point vs = foldl' add' (I.zeroPoint rank) points
-    count = length points
-    add' (I.Point va) (I.Point vb) = I.Point {I.unPoint = V.zipWith (+) va vb}
-
-clusterDim :: (V.Unbox a) => Cluster a -> Int
-clusterDim (Cluster _ centroid) = (V.length . I.unPoint) centroid
-
--- | Convert PointSum to Cluster.
-pointSumToCluser :: (V.Unbox a, Fractional a) => Int -> PointSum a -> Cluster a
-pointSumToCluser id (PointSum count xs) =
-  Cluster
-    { clusterId = id,
-      clusterCentroid =
-        I.Point $ V.map (\a -> a / fromIntegral count) (I.unPoint xs)
-    }
-{-# INLINE pointSumToCluser #-}
