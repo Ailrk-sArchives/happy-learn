@@ -15,21 +15,40 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.Except
 import qualified Data.Vector                   as Vec
 import qualified Data.Vector.Mutable           as MVec
+import           System.Random
 
 limit = 100
+data KMedoisConfig = KMedoisConfig { kmedconfigdim :: Int
+                                   , kmedconfignum :: Int
+                                   , kmedconfigpoints :: [Point]
+                                   , kmedconfigbound :: [(Double, Double)]
+                                   }
 
 data KMedoisState = KMedoisState { kmeddim :: Int
-                                 , kmedsnum :: Int
+                                 , kmednum :: Int
                                  , kmedclusters :: [Cluster]
                                  , kmedpoints :: [Point]
                                  }
-
 
 type KMedois' a = ExceptT ClusterError (State KMedoisState) a
 
 newtype KMedois a = KMean { unKmean :: KMedois' a }
   deriving (Functor, Applicative, Monad, MonadState KMedoisState, MonadError ClusterError)
 
+runKmedois :: KMedoisConfig -> IO (Either ClusterError [Cluster])
+runKmedois (KMedoisConfig dim ncluster points bounds) = do
+  cs <- initClusters
+  let s = initState cs
+  return $ flip evalState s $ runExceptT (unKmean kmedois)
+ where
+  initClusters = do
+    idxs <- replicateM ncluster $ randomRIO (0, length points)
+    return [ Cluster idx (points !! idx) | idx <- idxs ]  -- randomly choose
+  initState cl = KMedoisState { kmeddim      = dim
+                              , kmednum      = ncluster
+                              , kmedclusters = cl
+                              , kmedpoints   = points
+                              }
 
 kmedois :: KMedois [Cluster]
 kmedois = loop 0
@@ -48,6 +67,9 @@ kmedois = loop 0
 step :: KMedois [Cluster]
 step = assign >>= newCluster
 
+-- for each medoids m and for each non medoids o
+-- try swap m and o, compute the cost, keep the swap of the best cost.
+-- then perform best swap of mbest and obest.
 assign :: KMedois (Vec.Vector PointSum)
 assign = do
   KMedoisState dim ncluster clusters points <- get

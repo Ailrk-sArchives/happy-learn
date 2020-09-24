@@ -9,4 +9,3 @@ data AgglomerativeConfig = AgglomerativeConfig
   , agglAffinity :: Point -> Point -> Double
   }
 
-

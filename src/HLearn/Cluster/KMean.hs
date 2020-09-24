@@ -17,6 +17,7 @@ import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Trans.Except
 import           System.Random
+import           Debug.Trace
 
 limit = 100
 
@@ -47,10 +48,10 @@ runKmeanLloy (KMeanConfig dim ncluster points bounds) = do
     ps <- replicateM ncluster $ randomPoint bounds
     return [ Cluster idx p | (idx, p) <- [0 ..] `zip` ps ]
   initState cl = KMeanState { ksdim      = dim
-                         , ksnum      = ncluster
-                         , ksclusters = cl
-                         , kspoints   = points
-                         }
+                            , ksnum      = ncluster
+                            , ksclusters = cl
+                            , kspoints   = points
+                            }
 
 kmeanLloy :: KMean [Cluster]
 kmeanLloy = loop 0

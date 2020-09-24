@@ -23,8 +23,10 @@ library
   exposed-modules:
     HLearn.Cluster.KMean
     HLearn.Cluster.Data
+    HLearn.Cluster.Error
     HLearn.Internal.Data
     HLearn.DataSet.Import
+    HLearn.Internal.Metric
   other-modules:
       Paths_happy_learn
   -- other-extensions:
@@ -46,15 +48,17 @@ library
 test-suite happy-learn-test
   type:                exitcode-stdio-1.0
   default-language:    Haskell2010
-  other-modules:       Paths_happy_learn
+  other-modules:
+      Paths_happy_learn
+    , ClusterSpec
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:
       base >=4.7 && < 5
     , happy-learn
+    , hspec-discover
     , repa
     , vector
     , hspec
     , transformers
     , matplotlib
-    , hspec-discover
