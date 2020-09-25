@@ -4,6 +4,9 @@ module HLearn.Cluster.KMedois where
 
 import           Data.List
 import           Data.Function                  ( on )
+import           Control.Monad.ST
+import           Data.STRef
+import qualified Data.Vector.Unboxed           as U
 import qualified Data.Vector                   as Vec
 import qualified Data.Vector.Mutable           as MVec
 import           HLearn.Cluster.Error
@@ -13,9 +16,12 @@ import           HLearn.Internal.Metric
 import           Control.Monad.State
 import           Control.Monad.Except
 import           Control.Monad.Trans.Except
-import qualified Data.Vector                   as Vec
-import qualified Data.Vector.Mutable           as MVec
 import           System.Random
+
+--  record the best medoid and o in each cluster.
+data PreSwaped = PreSwaped { medoidId :: !Int
+                           , oId :: !Int
+                           }
 
 limit = 100
 data KMedoisConfig = KMedoisConfig { kmedconfigdim :: Int
@@ -60,7 +66,7 @@ kmedois = loop 0
       liftEither $ Left (ClusterInitError "too many clusters")
     clusters' <- step
     return clusters'
-    if and $ zipWith sameCluster clusters' clusters
+    if undefined -- TODO
       then return clusters
       else put (s { kmedclusters = clusters' }) >> loop (n + 1)
 
@@ -70,20 +76,44 @@ step = assign >>= newCluster
 -- for each medoids m and for each non medoids o
 -- try swap m and o, compute the cost, keep the swap of the best cost.
 -- then perform best swap of mbest and obest.
-assign :: KMedois (Vec.Vector PointSum)
+assign :: KMedois (Vec.Vector PreSwaped)
 assign = do
-  KMedoisState dim ncluster clusters points <- get
-  let nearestCluster p =
-        fst $ minimumBy (compare `on` snd) [ mkpair c p | c <- clusters ]
+  s@(KMedoisState dim ncluster clusters points) <- get
   return
     $ (Vec.create $ do
-        vec <- MVec.replicate ncluster (PointSum 0 $ zeroPoint dim)
-        let addpoint p = do
-              let c   = nearestCluster p
-                  cid = clusterId c
+        vec <- MVec.replicate ncluster (PreSwaped 0 0)
+        let localBestSwap :: Cluster -> KMedoisState -> PreSwaped
+            localBestSwap (Cluster ci _) s@(KMedoisState _ _ cs ps) =
+              fst $ minimumBy
+                (compare `on` snd)
+                [ (PreSwaped ci pi, cost $ swap ci pi s)
+                | pi <- [0 .. length ps]
+                ]
+
+        let addBestSwap c@(Cluster cid _) = do
+              let bs = localBestSwap c s
               ps <- MVec.read vec cid
-              MVec.write vec cid $! addToPointSum ps p
-        mapM_ addpoint points
+              MVec.write vec cid $! bs
+
+        mapM_ addBestSwap clusters
         return vec
       )
-  where mkpair c p = (c, sqDistance (clusterCent c) p)
+
+-- | swap a point and a cluster
+swap :: Int -> Int -> KMedoisState -> KMedoisState
+swap ci pi s@(KMedoisState dim _ cs ps) = runST $ do
+  csPointRef <- newSTRef $ clusterCent $ cs !! ci
+  psPointRef <- newSTRef $ ps !! pi
+  temp <- readSTRef csPointRef
+  writeSTRef csPointRef (ps !! pi)
+  writeSTRef psPointRef temp
+  return s
+
+
+cost :: KMedoisState -> Double
+cost (KMedoisState _ _ clusters points) =
+  sum [ euclideanDistance p c | (Cluster _ c) <- clusters, p <- points ]
+
+-- | filter away clustser has no point close to it.
+newCluster :: Vec.Vector PreSwaped -> KMedois [Cluster]
+newCluster vec = return $ []
