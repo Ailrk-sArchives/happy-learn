@@ -109,7 +109,6 @@ swap ci pi s@(KMedoisState dim _ cs ps) = runST $ do
   writeSTRef psPointRef temp
   return s
 
-
 cost :: KMedoisState -> Double
 cost (KMedoisState _ _ clusters points) =
   sum [ euclideanDistance p c | (Cluster _ c) <- clusters, p <- points ]
