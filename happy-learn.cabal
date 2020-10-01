@@ -37,9 +37,10 @@ library
     , deepseq
     , vector
     , bytestring
-    , repa
+    , matrix
     , mtl
     , transformers
+    , microlens-platform
     , random
     , matplotlib
   hs-source-dirs:      src

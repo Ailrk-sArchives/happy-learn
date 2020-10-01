@@ -17,23 +17,28 @@ import           Control.Monad.State
 import           Control.Monad.Except
 import           Control.Monad.Trans.Except
 import           System.Random
+import qualified Lens.Micro.Platform           as L
+import           Lens.Micro.Platform     hiding ( assign )
 
---  record the best medoid and o in each cluster.
-data PreSwaped = PreSwaped { medoidId :: !Int
-                           , oId :: !Int
+-- | record the best medoid and o in each cluster.
+data PreSwaped = PreSwaped { preswapCi :: !Int
+                           , preswapPi :: !Int
+                           -- points associated with swapped cluster cneter
+                           , preswapPoints :: ![Point]
                            }
 
 limit = 100
-data KMedoisConfig = KMedoisConfig { kmedconfigdim :: Int
-                                   , kmedconfignum :: Int
-                                   , kmedconfigpoints :: [Point]
-                                   , kmedconfigbound :: [(Double, Double)]
+data KMedoisConfig = KMedoisConfig { kmedconfigDim :: Int
+                                   , kmedconfigNum :: Int
+                                   , kmedconfigPoints :: [Point]
+                                   , kmedconfigBound :: [(Double, Double)]
                                    }
 
-data KMedoisState = KMedoisState { kmeddim :: Int
-                                 , kmednum :: Int
-                                 , kmedclusters :: [Cluster]
-                                 , kmedpoints :: [Point]
+data KMedoisState = KMedoisState { kmedDim :: Int
+                                 , kmedNum :: Int
+                                 , kmedClusters :: [Cluster]
+                                 , kmedPoints :: [Point]
+                                 , kmedCostImproved :: Bool
                                  }
 
 type KMedois' a = ExceptT ClusterError (State KMedoisState) a
@@ -49,69 +54,76 @@ runKmedois (KMedoisConfig dim ncluster points bounds) = do
  where
   initClusters = do
     idxs <- replicateM ncluster $ randomRIO (0, length points)
-    return [ Cluster idx (points !! idx) | idx <- idxs ]  -- randomly choose
-  initState cl = KMedoisState { kmeddim      = dim
-                              , kmednum      = ncluster
-                              , kmedclusters = cl
-                              , kmedpoints   = points
-                              }
+    return
+      [ Cluster { _clusterId     = idx
+                , _clusterCent   = (points !! idx)
+                , _clusterPoints = []
+                }
+      | idx <- idxs
+      ]  -- randomly choose
+  initState cl = KMedoisState dim ncluster cl points False
 
 kmedois :: KMedois [Cluster]
 kmedois = loop 0
  where
   loop :: Int -> KMedois [Cluster]
   loop n = do
-    s@(KMedoisState _ ncluster clusters _) <- get
+    s@(KMedoisState _ ncluster clusters _ costImproved) <- get
     when (ncluster > limit) $ do
       liftEither $ Left (ClusterInitError "too many clusters")
     clusters' <- step
     return clusters'
-    if undefined -- TODO
+    if costImproved
       then return clusters
-      else put (s { kmedclusters = clusters' }) >> loop (n + 1)
+      else put (s { kmedClusters = clusters' }) >> loop (n + 1)
 
 step :: KMedois [Cluster]
 step = assign >>= newCluster
+
 
 -- for each medoids m and for each non medoids o
 -- try swap m and o, compute the cost, keep the swap of the best cost.
 -- then perform best swap of mbest and obest.
 assign :: KMedois (Vec.Vector PreSwaped)
 assign = do
-  s@(KMedoisState dim ncluster clusters points) <- get
+  s@(KMedoisState dim ncluster clusters points _) <- get
   return
     $ (Vec.create $ do
-        vec <- MVec.replicate ncluster (PreSwaped 0 0)
-        let localBestSwap :: Cluster -> KMedoisState -> PreSwaped
-            localBestSwap (Cluster ci _) s@(KMedoisState _ _ cs ps) =
-              fst $ minimumBy
-                (compare `on` snd)
-                [ (PreSwaped ci pi, cost $ swap ci pi s)
-                | pi <- [0 .. length ps]
-                ]
-
-        let addBestSwap c@(Cluster cid _) = do
+        vec <- MVec.replicate ncluster (PreSwaped 0 0 [])
+        let addBestSwap c@(Cluster cid _ _) = do
               let bs = localBestSwap c s
               ps <- MVec.read vec cid
               MVec.write vec cid $! bs
-
         mapM_ addBestSwap clusters
         return vec
       )
+ where
+  localBestSwap :: Cluster -> KMedoisState -> PreSwaped
+  localBestSwap (Cluster ci _ _) s@(KMedoisState _ _ cs ps _) = fst $ minimumBy
+    (compare `on` snd)
+    [ let cost  = getCost $ swap (ci, pi) s
+          pswap = PreSwaped ci pi []
+      in  (pswap, cost)
+    | pi <- [0 .. length ps]
+    ]
 
--- | swap a point and a cluster
-swap :: Int -> Int -> KMedoisState -> KMedoisState
-swap ci pi s@(KMedoisState dim _ cs ps) = runST $ do
-  csPointRef <- newSTRef $ clusterCent $ cs !! ci
-  psPointRef <- newSTRef $ ps !! pi
-  temp <- readSTRef csPointRef
-  writeSTRef csPointRef (ps !! pi)
-  writeSTRef psPointRef temp
-  return s
+-- | swap a point and a cluster, return the swap as new kmedoids state
+swap :: (Int, Int) -> KMedoisState -> KMedoisState
+swap (ci, pi) s@(KMedoisState _ _ cs ps _) =
+  let clusterP = cs !! ci ^. clusterCent
+      pointsP  = ps !! pi
+  in  s { kmedClusters = cs & (ix ci) . clusterCent .~ pointsP
+        , kmedPoints   = ps & (ix pi) .~ clusterP
+        }
 
-cost :: KMedoisState -> Double
-cost (KMedoisState _ _ clusters points) =
-  sum [ euclideanDistance p c | (Cluster _ c) <- clusters, p <- points ]
+getCost :: KMedoisState -> Double
+getCost (KMedoisState _ _ clusters points _) =
+  sum [ euclideanDistance p c | (Cluster _ c _) <- clusters, p <- points ]
+
+isCostImproved :: Double -> Double -> Bool
+isCostImproved old new | new - old < 0 = True
+                       | otherwise     = False
+
 
 -- | filter away clustser has no point close to it.
 newCluster :: Vec.Vector PreSwaped -> KMedois [Cluster]

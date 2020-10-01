@@ -27,17 +27,19 @@ kmeanTest = do
   case sequenceA [result1, result2] of
     Left  s           -> return ()
     Right (v : u : _) -> do
-      let v' = transpose $ pToList $ clusterCent <$> v
-      let u' = transpose $ pToList $ clusterCent <$> u
+      let v' = transpose . pToList $ _clusterCent <$> v
+      let u' = transpose . pToList $ _clusterCent <$> u
       onscreen
-        $  addSubplot (2 :: Int) (1 :: Int) (1 :: Int)
-        %  scatter (a' Prelude.!! 0) (a' Prelude.!! 1)
-        %  scatter (v' Prelude.!! 0) (v' Prelude.!! 1)
-        @@ [o2 "color" "r"]
-        %  title "KMean"
-        %  addSubplot (2 :: Int) (1 :: Int) (2 :: Int)
-        %  scatter (a' Prelude.!! 0) (a' Prelude.!! 1)
-        %  scatter (u' Prelude.!! 0) (u' Prelude.!! 1)
-        @@ [o2 "color" "r"]
-        %  title "KMean1"
+        $ (  addSubplot (2 :: Int) (1 :: Int) (1 :: Int)
+          %  scatter (a' Prelude.!! 0) (a' Prelude.!! 1)
+          %  scatter (v' Prelude.!! 0) (v' Prelude.!! 1)
+          @@ [o2 "color" "r"]
+          %  title "KMean"
+          )
+        % (  addSubplot (2 :: Int) (1 :: Int) (2 :: Int)
+          %  scatter (a' Prelude.!! 0) (a' Prelude.!! 1)
+          %  scatter (u' Prelude.!! 0) (u' Prelude.!! 1)
+          @@ [o2 "color" "r"]
+          %  title "KMean1"
+          )
   where pToList d = (\(Point _ v) -> U.toList v) <$> d

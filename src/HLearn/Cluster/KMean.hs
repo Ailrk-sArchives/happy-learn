@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module HLearn.Cluster.KMean where
 
@@ -19,33 +20,37 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.Except
 import           System.Random
 import           Control.DeepSeq
+import qualified Lens.Micro.Platform           as L
+import           Lens.Micro.Platform     hiding ( assign )
 
 limit = 100
 
-data PointSum = PointSum { psumCount :: !Int
-                         , psumPoint :: !Point
+data PointSum = PointSum { _psumCount :: !Int
+                         , _psumPoint :: !Point
+                         , _ppoints :: ![Point]
                          } deriving (Eq, Show)
+L.makeLenses ''PointSum
 
 instance NFData PointSum where
-  rnf (PointSum count (Point dim xs)) = ()
+  rnf (PointSum count (Point dim xs) ps) = ()
 
 -- | indicate if two clusters are close enough that we can
 -- treet them as the same cluster
 sameCluster :: Cluster -> Cluster -> Bool
-sameCluster (Cluster a _) (Cluster b _) | a /= b = False
-sameCluster (Cluster _ as) (Cluster _ bs)        = (sqDistance as bs) < 0.001
+sameCluster (Cluster a _ _) (Cluster b _ _) | a /= b = False
+sameCluster (Cluster _ as _) (Cluster _ bs _) = (sqDistance as bs) < 0.001
 
 
-data KMeanConfig = KMeanConfig { kconfigdim :: Int
-                               , kconfignum :: Int
-                               , kconfigpoints :: [Point]
-                               , kconfigbound :: [(Double, Double)]
+data KMeanConfig = KMeanConfig { kconfigDim :: Int
+                               , kconfigNum :: Int
+                               , kconfigPoints :: [Point]
+                               , kconfigBound :: [(Double, Double)]
                                }
 
-data KMeanState = KMeanState { ksdim :: Int
-                             , ksnum :: Int  -- number of clusters
-                             , ksclusters :: [Cluster]
-                             , kspoints :: [Point]
+data KMeanState = KMeanState { ksDim :: Int
+                             , ksNum :: Int  -- number of clusters
+                             , ksClusters :: [Cluster]
+                             , ksPoints :: [Point]
                              }
 
 type KMean' a = ExceptT ClusterError (State KMeanState) a
@@ -61,11 +66,11 @@ runKmeanLloy (KMeanConfig dim ncluster points bounds) = do
  where
   initClusters = do
     ps <- replicateM ncluster $ randomPoint bounds
-    return [ Cluster idx p | (idx, p) <- [0 ..] `zip` ps ]
-  initState cl = KMeanState { ksdim      = dim
-                            , ksnum      = ncluster
-                            , ksclusters = cl
-                            , kspoints   = points
+    return [ Cluster idx p [] | (idx, p) <- [0 ..] `zip` ps ]
+  initState cl = KMeanState { ksDim      = dim
+                            , ksNum      = ncluster
+                            , ksClusters = cl
+                            , ksPoints   = points
                             }
 
 kmeanLloy :: KMean [Cluster]
@@ -80,7 +85,7 @@ kmeanLloy = loop 0
     return clusters'
     if and $ zipWith sameCluster clusters' clusters
       then return clusters
-      else put (s { ksclusters = clusters' }) >> loop (n + 1)
+      else put (s { ksClusters = clusters' }) >> loop (n + 1)
 
 step :: KMean [Cluster]
 step = assign >>= newCluster
@@ -92,32 +97,37 @@ assign = do
         fst $ minimumBy (compare `on` snd) [ mkpair c p | c <- clusters ]
   return
     $ (Vec.create $ do
-        vec <- MVec.replicate ncluster (PointSum 0 $ zeroPoint dim)
+        vec <- MVec.replicate ncluster (PointSum 0 (zeroPoint dim) [])
         let addpoint p = do
               let c   = nearestCluster p
-                  cid = clusterId c
+                  cid = _clusterId c
               ps <- MVec.read vec cid
               MVec.write vec cid $! addToPointSum ps p
         mapM_ addpoint points
         return vec
       )
-  where mkpair c p = (c, sqDistance (clusterCent c) p)
+  where mkpair c p = (c, sqDistance (_clusterCent c) p)
 
 addToPointSum :: PointSum -> Point -> PointSum
-addToPointSum (PointSum count (Point _ ps)) p@(Point _ xs) =
-  PointSum (count + 1) (p { unPoint = G.zipWith (+) xs ps })
+addToPointSum psum p@(Point _ xs) =
+  psum
+    & (psumCount +~ 1)
+    & (psumPoint . unPoint %~ (\ps -> G.zipWith (+) xs ps))
+    & (ppoints %~ (\points -> p : points))
 
 pointSumToCluster :: Int -> PointSum -> Cluster
-pointSumToCluster cid (PointSum count p) = Cluster
-  { clusterId   = cid
-  , clusterCent = p { unPoint = G.map (/ (fromIntegral count)) $ unPoint p }
+pointSumToCluster cid ps@(PointSum count p points) = Cluster
+  { _clusterId = cid
+  , _clusterCent = p { _unPoint = G.map (/ (fromIntegral count)) $ _unPoint p }
+  , _clusterPoints = points
   }
 
 -- | filter away clustser has no point close to it.
+
 newCluster :: (MonadState s m) => Vec.Vector PointSum -> m [Cluster]
 newCluster vec =
   return
     $ [ pointSumToCluster i ps
-      | (i, ps@(PointSum count _)) <- [0 ..] `Prelude.zip` (Vec.toList vec)
-      , count > 0
+      | (i, ps) <- [0 ..] `Prelude.zip` (Vec.toList vec)
+      , ps ^. psumCount > 0
       ]
