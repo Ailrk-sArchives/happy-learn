@@ -7,9 +7,14 @@ import           HLearn.Internal.Data
 import           Lens.Micro.Platform           as L
                                          hiding ( assign )
 
-data LinearModel = LinearModel { linmodY :: Point
-                               , linmodX :: !(M.Matrix Double)
-                               , linmodBeta :: Point
-                               , linmodSemga :: U.Vector Double
+-- | Y = bX + s. Known Y, and X trying to find b and s.
+data LinearModelData = LinearModelData { linmodDataX :: M.Matrix Double
+                                       , linmodDataY:: Point
+                                       }
+L.makeLenses ''LinearModelData
+
+
+data LinearModel = LinearModel { linmodBetaHat :: Point
+                               , linmodResidue :: Point
                                }
 L.makeLenses ''LinearModel

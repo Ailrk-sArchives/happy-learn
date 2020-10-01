@@ -3,8 +3,6 @@ module HLearn.Cluster.Hierachical where
 
 import           Data.List
 import           Data.Function                  ( on )
-import           Control.Monad.ST
-import           Data.STRef
 import qualified Data.Vector.Unboxed           as U
 import qualified Data.Vector                   as Vec
 import qualified Data.Vector.Mutable           as MVec

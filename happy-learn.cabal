@@ -38,6 +38,7 @@ library
     , vector
     , bytestring
     , matrix
+    , statistics
     , mtl
     , transformers
     , microlens-platform
@@ -58,7 +59,6 @@ test-suite happy-learn-test
       base >=4.7 && < 5
     , happy-learn
     , hspec-discover
-    , repa
     , vector
     , hspec
     , transformers

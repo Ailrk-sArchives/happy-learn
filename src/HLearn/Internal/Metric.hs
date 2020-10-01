@@ -1,9 +1,18 @@
-module HLearn.Internal.Metric where
+module HLearn.Internal.Metric
+  ( sqDistance
+  , euclideanDistance
+  , manhattanDistance
+  , maximumDistance
+  )
+where
 
 
 import           HLearn.Internal.Data
-import           Data.Vector.Generic           as G
+import qualified Data.Vector.Generic           as G
+import qualified Data.Vector                   as V
+import           Lens.Micro.Platform     hiding ( assign )
 
+-- distance metrics --
 -- | to Generate distance metric functiosn
 distanceMetric :: (Double -> Double -> Double) -> Point -> Point -> Double
 distanceMetric f (Point _ v1) (Point _ v2) = G.sum $ G.zipWith f v1 v2

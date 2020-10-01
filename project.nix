@@ -1,6 +1,6 @@
 { mkDerivation, aeson, base, bytestring, deepseq, hspec
 , hspec-discover, matplotlib, matrix, microlens-platform, mtl
-, parallel, random, repa, stdenv, transformers, vector
+, parallel, random, statistics, stdenv, transformers, vector
 }:
 mkDerivation {
   pname = "happy-learn";
@@ -8,10 +8,10 @@ mkDerivation {
   src = ./.;
   libraryHaskellDepends = [
     aeson base bytestring deepseq matplotlib matrix microlens-platform
-    mtl parallel random transformers vector
+    mtl parallel random statistics transformers vector
   ];
   testHaskellDepends = [
-    base hspec hspec-discover matplotlib repa transformers vector
+    base hspec hspec-discover matplotlib transformers vector
   ];
   testToolDepends = [ hspec-discover ];
   license = stdenv.lib.licenses.mit;

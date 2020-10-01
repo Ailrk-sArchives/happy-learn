@@ -37,5 +37,3 @@ randomPoint bounds = do
   let dim = Prelude.length bounds
   rp <- sequenceA $ randomRIO <$> bounds
   return $ Point dim (U.fromList rp)
-
-

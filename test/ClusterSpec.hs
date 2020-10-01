@@ -22,8 +22,8 @@ kmeanTest = do
   ClusterData d <- readCluserData
   let a  = pToList d
       a' = transpose a
-  result1 <- runKmeanLloy (KMeanConfig 2 3 d [(0, 100), (0, 100)])
-  result2 <- runKmeanLloy (KMeanConfig 2 2 d [(0, 100), (0, 100)])
+  result1 <- runKmeanLloy (KMeanEnv 2 3 d [(0, 100), (0, 100)])
+  result2 <- runKmeanLloy (KMeanEnv 2 4 d [(0, 100), (0, 100)])
   case sequenceA [result1, result2] of
     Left  s           -> return ()
     Right (v : u : _) -> do
